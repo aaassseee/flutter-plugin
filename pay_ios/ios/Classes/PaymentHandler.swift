@@ -150,23 +150,45 @@ class PaymentHandler: NSObject {
     
     // Include the shipping fields required.
     if let requiredShippingFields = paymentConfiguration["requiredShippingContactFields"] as? Array<String> {
-      paymentRequest.requiredShippingContactFields = Set(requiredShippingFields.compactMap { shippingField in
-        PKContactField.fromString(shippingField)
-      })
+      if #available(iOS 11.0, *) {
+        paymentRequest.requiredShippingContactFields = Set(requiredShippingFields.compactMap { shippingField in
+          PKContactField.fromString(shippingField)
+        })
+      } else {
+        var addressFields = PKAddressField.init()
+        requiredShippingFields.forEach({ shippingField in
+          if let field = PKAddressField.fromString(shippingField) {
+            addressFields.insert(field)
+          }
+        })
+        paymentRequest.requiredShippingAddressFields = addressFields
+      }
     }
-    
+
     // Include the billing fields required.
     if let requiredBillingFields = paymentConfiguration["requiredBillingContactFields"] as? Array<String> {
-      paymentRequest.requiredBillingContactFields = Set(requiredBillingFields.compactMap { billingField in
-        PKContactField.fromString(billingField)
-      })
+      if #available(iOS 11.0, *) {
+        paymentRequest.requiredBillingContactFields = Set(requiredBillingFields.compactMap { billingField in
+            PKContactField.fromString(billingField)
+        })
+      } else {
+        var billingFields = PKAddressField.init()
+        requiredBillingFields.forEach({ shippingField in
+          guard let field = PKAddressField.fromString(shippingField) else {
+            return
+          }
+
+          billingFields.insert(field)
+        })
+        paymentRequest.requiredBillingAddressFields = billingFields
+      }
     }
-    
+
     // Add supported networks if available.
     if let supportedNetworks = supportedNetworks(from: paymentConfigurationString) {
       paymentRequest.supportedNetworks = supportedNetworks
     }
-    
+
     return paymentRequest
   }
 }
@@ -177,20 +199,37 @@ extension PaymentHandler: PKPaymentAuthorizationControllerDelegate {
   func paymentAuthorizationControllerWillAuthorizePayment(_ controller: PKPaymentAuthorizationController) {
       paymentHandlerStatus = .authorizationStarted
   }
-    
+
+  @available(iOS 11.0, *)
   func paymentAuthorizationController(_: PKPaymentAuthorizationController, didAuthorizePayment payment: PKPayment, handler completion: @escaping (PKPaymentAuthorizationResult) -> Void) {
-    
+
     // Collect payment result or error and return if no payment was selected
     guard let paymentResultData = try? JSONSerialization.data(withJSONObject: payment.toDictionary()) else {
       self.paymentResult(FlutterError(code: "paymentResultDeserializationFailed", message: nil, details: nil))
       return
     }
-    
+
     // Return the result back to the channel
     self.paymentResult(String(decoding: paymentResultData, as: UTF8.self))
-    
+
     paymentHandlerStatus = .authorized
     completion(PKPaymentAuthorizationResult(status: PKPaymentAuthorizationStatus.success, errors: nil))
+  }
+
+  @available(iOS 10.0, *)
+  @available(iOS, deprecated: 11.0)
+  func paymentAuthorizationController(_ controller: PKPaymentAuthorizationController, didAuthorizePayment payment: PKPayment, completion: @escaping (PKPaymentAuthorizationStatus) -> Void) {
+    // Collect payment result or error and return if no payment was selected
+    guard let paymentResultData = try? JSONSerialization.data(withJSONObject: payment.toDictionary()) else {
+      self.paymentResult(FlutterError(code: "paymentResultDeserializationFailed", message: nil, details: nil))
+      return
+    }
+
+    // Return the result back to the channel
+    self.paymentResult(String(decoding: paymentResultData, as: UTF8.self))
+
+    paymentHandlerStatus = .authorized
+    completion(PKPaymentAuthorizationStatus.success)
   }
   
   func paymentAuthorizationControllerDidFinish(_ controller: PKPaymentAuthorizationController) {

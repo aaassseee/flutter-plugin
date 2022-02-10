@@ -82,16 +82,21 @@ extension CNPostalAddress {
 
   /// Creates a `Dictionary` representation of the `CNPostalAddress` object.
   public func toDictionary() -> [String: Any] {
-    return [
+    var dict = [
       "street": street,
-      "subLocality": subLocality,
       "city": city,
-      "subAdministrativeArea": subAdministrativeArea,
       "state": state,
       "postalCode": postalCode,
       "country": country,
       "isoCountryCode": isoCountryCode
-    ].compactMapValues { $0 }
+    ]
+
+    if #available(iOS 10.3, *) {
+      dict["subLocality"] = subLocality
+      dict["subAdministrativeArea"] = subAdministrativeArea
+    }
+
+    return dict.compactMapValues { $0 }
   }
 }
 
@@ -119,6 +124,7 @@ extension PKPaymentNetwork {
       guard #available(iOS 12.0, *) else { return nil }
       return .cartesBancaires
     case "chinaUnionPay":
+      guard #available(iOS 9.2, *) else { return nil }
       return .chinaUnionPay
     case "discover":
       return .discover
@@ -132,10 +138,13 @@ extension PKPaymentNetwork {
       guard #available(iOS 12.1.1, *) else { return nil }
       return .elo
     case "idCredit":
+      guard #available(iOS 10.3, *) else { return nil }
       return .idCredit
     case "interac":
+      guard #available(iOS 9.2, *) else { return nil }
       return .interac
     case "JCB":
+      guard #available(iOS 10.1, *) else { return nil }
       return .JCB
     case "mada":
       guard #available(iOS 12.1.1, *) else { return nil }
@@ -148,8 +157,10 @@ extension PKPaymentNetwork {
     case "privateLabel":
       return .privateLabel
     case "quicPay":
+      guard #available(iOS 10.3, *) else { return nil }
       return .quicPay
     case "suica":
+      guard #available(iOS 10.1, *) else { return nil }
       return .suica
     case "visa":
       return .visa
@@ -203,6 +214,7 @@ extension PKMerchantCapability {
 }
 
 /// A set of utility methods associated to `PKContactField`.
+@available(iOS 11.0, *)
 extension PKContactField {
 
   /// Creates a `PKContactField` object from a contact field item in string format.
@@ -216,6 +228,26 @@ extension PKContactField {
       return .phoneNumber
     case "phoneticName":
       return .phoneticName
+    case "postalAddress":
+      return .postalAddress
+    default:
+      return nil
+    }
+  }
+}
+
+/// A set of utility methods associated to `PKAddressField`.
+extension PKAddressField {
+
+  /// Creates a `PKAddressField` object from a address field item in string format.
+  public static func fromString(_ addressFieldItem: String) -> PKAddressField? {
+    switch addressFieldItem {
+    case "emailAddress":
+      return .email
+    case "name":
+      return .name
+    case "phoneNumber":
+      return .phone
     case "postalAddress":
       return .postalAddress
     default:
